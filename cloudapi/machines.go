@@ -303,7 +303,7 @@ func (c *Client) ListMachines() ([]string, error) {
 	return resp.Result, nil
 }
 
-func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
+func (c *Client) ListMachinesFilteredFull(vmfilter VmDetails) ([]string, []VmDetails, error) {
 //J
 	var resp VmsResponse
 	filter := NewFilter()
@@ -315,13 +315,14 @@ func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
 		resp:   &resp,
 	}
 	if _, err := c.sendRequest(req); err != nil {
-		return nil, errors.Newf2(err, resp.Detail, "failed to get list of machines")
+		return nil, nil, errors.Newf2(err, resp.Detail, "failed to get list of machines")
 	}
 
+	vmDetails := resp.Result
 	var vmlist []string
 
 	// iterate over tags to filter VMs
-	for _, vm := range resp.Result {
+	for _, vm := range vmDetails {
 		if
 		(vmfilter.Hostname != "" && strings.Contains(vm.Hostname, vmfilter.Hostname)) ||
 		(vmfilter.Uuid != "" && vmfilter.Uuid == vm.Uuid) ||
@@ -352,7 +353,17 @@ func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
 		}
 	}
 
-	return vmlist, nil
+	return vmlist, vmDetails, nil
+}
+
+// returns simplified version - only list of names
+func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
+	vmList, _, err := c.ListMachinesFilteredFull(vmfilter)
+	if err != nil {
+		return nil, err
+	} else {
+		return vmList, nil
+	}
 }
 
 // CountMachines returns the number of machines on record for an account.
