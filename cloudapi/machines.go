@@ -77,6 +77,7 @@ type Machine struct {
 // when creating a new machine.
 // https://docs.danubecloud.org/api-reference/api/vm_define.html#post--vm-(hostname_or_uuid)-define
 type MachineDefinition struct {
+	// int values of zero (or bool false) mean Danube's default (because of omitempty)
     ReqData
 	Name            string          `json:"name"`                 // VM name or UUID
     Alias           string          `json:"alias,omitempty"`      // DNS name without a domain
@@ -115,6 +116,7 @@ type MachineDefinition struct {
 }
 
 type VmNicDefinition struct {
+	// int values of zero (or bool false) mean Danube's default (because of omitempty)
     ReqData
 	NicId                    int           `json:"nic_id,omitempty"`
 	Net                      string        `json:"net,omitempty"`
@@ -154,6 +156,11 @@ type VmDiskDefinition struct {
 type VmResponse struct {
 	DcResponse
 	Result VmDetails            `json:"result"`
+}
+
+type VmsResponse struct {
+	DcResponse
+	Result []VmDetails            `json:"result"`
 }
 
 type CreateMachineResponse struct {
@@ -294,6 +301,58 @@ func (c *Client) ListMachines() ([]string, error) {
 		return nil, errors.Newf2(err, resp.Detail, "failed to get list of machines")
 	}
 	return resp.Result, nil
+}
+
+func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
+//J
+	var resp VmsResponse
+	filter := NewFilter()
+	filter.Set("extended", "true")
+	req := request{
+		method: client.GET,
+		url:    "vm",
+		filter:	filter,
+		resp:   &resp,
+	}
+	if _, err := c.sendRequest(req); err != nil {
+		return nil, errors.Newf2(err, resp.Detail, "failed to get list of machines")
+	}
+
+	var vmlist []string
+
+	// iterate over tags to filter VMs
+	for _, vm := range resp.Result {
+		if
+		(vmfilter.Hostname != "" && strings.Contains(vm.Hostname, vmfilter.Hostname)) ||
+		(vmfilter.Uuid != "" && vmfilter.Uuid == vm.Uuid) ||
+		(vmfilter.Alias != "" && strings.Contains(vm.Alias, vmfilter.Alias)) ||
+		(vmfilter.Node != "" && strings.Contains(vm.Node, vmfilter.Node)) ||
+		(vmfilter.Owner != "" && vmfilter.Owner == vm.Owner) ||
+		(vmfilter.Status != "" && vmfilter.Status == vm.Status) {
+			vmlist = append(vmlist, vm.Hostname)
+
+		} else if vmfilter.Tags != nil {
+			someTagNotFound := false
+			for _, tag := range vmfilter.Tags {
+				found := false
+				for _, vmtag := range vm.Tags {
+					if vmtag == tag {
+						found = true
+						break
+					}
+				}
+				if !found {
+					someTagNotFound = true
+					break
+				}
+			}
+			if !someTagNotFound {
+				vmlist = append(vmlist, vm.Hostname)
+			}
+		}
+	}
+
+	return vmlist, nil
 }
 
 // CountMachines returns the number of machines on record for an account.
