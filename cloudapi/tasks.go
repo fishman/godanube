@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	VmSnapTimeout	= 30
+	TaskQuerySleepTime = 2	// sec
+	VmSnapTimeout	= 30 / TaskQuerySleepTime
 )
 
 type TaskInfo struct {
@@ -38,6 +39,20 @@ func (c *Client) GetTaskInfo(taskId string) (*TaskResponse, error) {
 	return &resp, nil
 }
 
+func (c *Client) GetRunningTasks() ([]string, error) {
+	var resp []string
+	req := request{
+		method:     client.GET,
+		expectedStatuses: []int{http.StatusOK},
+		url:        "task",
+		resp:		&resp,
+	}
+	if _, err := c.sendRequest(req); err != nil {
+		return nil, errors.Newf(err, "failed to get running tasks")
+	}
+	return resp, nil
+}
+
 func (c *Client) WaitForTaskStatus(taskId, targetStatus string, timeoutSec uint, validHTTPStatuses []int) (*TaskInfo, error) {
 	var resp TaskResponse
 	req := request{
@@ -55,7 +70,7 @@ func (c *Client) WaitForTaskStatus(taskId, targetStatus string, timeoutSec uint,
 		} else if resp.Status == "FAILED" {
 				return &resp.Result, errors.Newf(nil, "Task \"%s\" has failed", taskId)
 		} else {
-			time.Sleep(time.Second)
+			time.Sleep(TaskQuerySleepTime * time.Second)
 			if(timeoutSec <= 0) {
 				return &resp.Result, errors.Newf(nil, "Timed out waiting for task \"%s\"", taskId)
 			} else {

@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	//"fmt"
+	"fmt"
 
 	"github.com/erigones/godanube/client"
 	jh "github.com/erigones/godanube/http"
@@ -201,6 +201,9 @@ func (c *Client) sendRequest(req request) (*jh.ResponseData, error) {
 		RespHeaders:    req.respHeader,
 		ExpectedStatus: req.expectedStatuses,
 	}
+
+	fmt.Printf("Calling %s on %s\n", req.method, req.url)
+
 	err := c.client.SendRequest(req.method, req.url, "", &request, &respData)
 	return &respData, err
 }

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
 	"strings"
+	"time"
 
 	"github.com/erigones/godanube/client"
 	"github.com/erigones/godanube/errors"
@@ -20,7 +20,8 @@ const (
     OsTypeSunosZone = 5
     OsTypeLinuxZone = 6
 
-    VmDeployTimeout = 300   // seconds
+    VmDeployTimeout = 300 / TaskQuerySleepTime   // seconds
+	VmDeleteTimeout = 100 / TaskQuerySleepTime
 )
 
 // Machine represent a provisioned virtual machines
@@ -152,6 +153,12 @@ type VmDiskDefinition struct {
 	ImageTagsInherit         bool          `json:"image_tags_inherit,omitempty"`
 }
 
+type CreateMachineOpts struct {
+	Vm		MachineDefinition
+	Disks	[]VmDiskDefinition
+	Nics	[]VmNicDefinition
+}
+
 /*** STRUCTS FOR VM-SPECIFIC DC RESPONSES ***/
 type VmResponse struct {
 	DcResponse
@@ -260,7 +267,7 @@ type jsonOpts MachineDefinition
 // MarshalJSON turns the given MachineDefinition into JSON
 func (opts MachineDefinition) MarshalJSON() ([]byte, error) {
 	jo := jsonOpts(opts)
-	data, err := json.Marshal(&jo)
+	status := 
 	if err != nil {
 		return nil, err
 	}
@@ -462,6 +469,7 @@ func (c *Client) GetMachineDisks(machineId string) ([]VmDiskDefinition, error) {
 
 // CreateMachine creates a new machine definition with the options specified.
 func (c *Client) CreateMachineDefinition(opts MachineDefinition) (*MachineDefinition, error) {
+//J
 	var resp CreateMachineResponse
 	req := request{
 		method:         client.POST,
@@ -478,7 +486,7 @@ func (c *Client) CreateMachineDefinition(opts MachineDefinition) (*MachineDefini
 }
 
 func (c *Client) AddMachineNicDefinition(machineID string, opts VmNicDefinition) (*VmNicDefinition, error) {
-    errStr := "failed to create nic definition for machine: %s"
+    errStr := "failed to reate nic definition for machine: %s"
     nics, nicErr := c.GetMachineNics(machineID)
 	if nicErr != nil {
 		return nil, errors.Newf(nicErr, errStr, machineID)
@@ -560,7 +568,7 @@ func (c *Client) ApplyMachineChanges(machineID string) (error) {
 		return errors.Newf2(err, resp.Detail, errMsg, machineID)
 	}
 
-	taskDetail, err := c.WaitForTaskStatus(resp.Task_id, "SUCCESS", VmDeployTimeout, req.expectedStatuses)
+	taskDetail, err := c.WaitForTaskStatus(resp.Task_id, "SUCCESS", VmDeleteTimeout, req.expectedStatuses)
 	if err != nil {
 		return errors.Newf2(err, taskDetail.Message, errMsg, machineID)
 	}
@@ -569,19 +577,34 @@ func (c *Client) ApplyMachineChanges(machineID string) (error) {
 }
 
 // CreateMachine creates a new machine with the options specified.
-func (c *Client) CreateMachine(opts MachineDefinition) (*Machine, error) {
-	var resp Machine
-	req := request{
-		method:         client.POST,
-		url:            apiMachines,
-		reqValue:       opts,
-		resp:           &resp,
-		expectedStatus: http.StatusCreated,
+func (c *Client) CreateMachine(definition CreateMachineOpts) (*MachineDefinition, error) {
+//J
+	machine, err := c.CreateMachineDefinition(definition.Vm)
+	if err != nil {
+		c.DeleteMachineDefinition(machine.Uuid)
+		return nil, err
 	}
-	if _, err := c.sendRequest(req); err != nil {
-		return nil, errors.Newf(err, "failed to create machine with name: %s", opts.Name)
+
+	for _, diskDef := range definition.Disks {
+		if _, err := c.AddMachineDiskDefinition(machine.Uuid, diskDef); err != nil {
+			c.DeleteMachineDefinition(machine.Uuid)
+			return nil, err
+		}
 	}
-	return &resp, nil
+
+	for _, nicDef := range definition.Nics {
+		if _, err := c.AddMachineNicDefinition(machine.Uuid, nicDef); err != nil {
+			c.DeleteMachineDefinition(machine.Uuid)
+			return nil, err
+		}
+	}
+
+	if err := c.DeployMachine(machine.Uuid); err != nil {
+		c.DeleteMachineDefinition(machine.Uuid)
+		return nil, err
+	}
+
+	return machine, nil
 }
 
 // StopMachine stops a running machine.
@@ -591,6 +614,7 @@ func (c *Client) StopMachine(machineID string, force bool) error {
 	if state, err := c.GetMachineState(machineID); err == nil && *state == "stopped" {
 		return nil
 	}
+	var resp DcResponse
 	var opts ReqData
 	opts.Force = force
 	req := request{
@@ -598,24 +622,39 @@ func (c *Client) StopMachine(machineID string, force bool) error {
 		url:            fmt.Sprintf("vm/%s/status/stop/", machineID),
 		expectedStatuses: []int{http.StatusCreated, http.StatusOK},
 		reqValue:		&opts,
+		resp:           &resp,
 	}
 	if _, err := c.sendRequest(req); err != nil {
-		return errors.Newf(err, "failed to stop machine with id: %s", machineID)
+		return errors.Newf2(err, resp.Detail, "failed to stop machine with id: %s", machineID)
 	}
+
+	_, err := c.WaitForTaskStatus(resp.Task_id, "SUCCESS", VmDeleteTimeout, req.expectedStatuses)
+	if err != nil {
+		return errors.Newf(err, "failed to stop machine \"%s\"", machineID)
+	}
+
 	return nil
 }
 
 // StartMachine starts a stopped machine.
 // See API docs: http://apidocs.joyent.com/cloudapi/#StartMachine
 func (c *Client) StartMachine(machineID string) error {
+	var resp DcResponse
 	req := request{
 		method:         client.POST,
 		url:            fmt.Sprintf("%s/%s?action=%s", apiMachines, machineID, actionStart),
 		expectedStatus: http.StatusAccepted,
+		resp:           &resp,
 	}
 	if _, err := c.sendRequest(req); err != nil {
-		return errors.Newf(err, "failed to start machine with id: %s", machineID)
+		return errors.Newf2(err, resp.Detail, "failed to start machine with id: %s", machineID)
 	}
+
+	_, err := c.WaitForTaskStatus(resp.Task_id, "SUCCESS", VmDeleteTimeout, req.expectedStatuses)
+	if err != nil {
+		return errors.Newf(err, "failed to stop machine \"%s\"", machineID)
+	}
+
 	return nil
 }
 
@@ -665,23 +704,21 @@ func (c *Client) RenameMachine(machineID, machineName string) error {
 
 // Delete machine data. Leaves the machine definition.
 // Use DeleteMachineDefinition() for complete removal.
-func (c *Client) DestroyMachine(machineID string, force bool) error {
+func (c *Client) DestroyMachine(machineID string) error {
 //J
 	var resp DcResponse
-	var opts = ReqData{Force: force}
 	req := request{
 		method:         client.DELETE,
 		url:            makeURL("vm", machineID),
 		expectedStatuses: []int{http.StatusCreated, http.StatusOK}, // Pending, OK
 		resp:           &resp,
-		reqValue:       &opts,
 	}
 
 	if _, err := c.sendRequest(req); err != nil {
 		return errors.Newf2(err, resp.Detail, "failed to delete machine \"%s\"", machineID)
 	}
 
-	_, err := c.WaitForTaskStatus(resp.Task_id, "SUCCESS", VmDeployTimeout, req.expectedStatuses)
+	_, err := c.WaitForTaskStatus(resp.Task_id, "SUCCESS", VmDeleteTimeout, req.expectedStatuses)
 	if err != nil {
 		return errors.Newf(err, "failed to delete machine \"%s\"", machineID)
 	}
@@ -702,6 +739,65 @@ func (c *Client) DeleteMachineDefinition(machineID string) error {
 
 	if _, err := c.sendRequest(req); err != nil {
 		return errors.Newf2(err, resp.Detail, "failed to delete machine \"%s\"", machineID)
+	}
+
+	return nil
+}
+
+func (c *Client) DeleteMachine(machineID string, force bool) error {
+	errMsg := "failed to delete machine: " + machineID
+
+	var status string
+	for timeout := 30; timeout > 0; timeout-=1 {
+		vmStatus, err := c.GetMachineState(machineID)
+		if err != nil {
+			return errors.Newf(err, errMsg)
+		}
+		status = *vmStatus
+
+		if
+		status == "deploying" || status == "notready" ||
+		status == "starting" || status == "stopping" ||
+		strings.HasSuffix(status, "-") {
+			// transient state, wait for finish
+			time.Sleep(TaskQuerySleepTime * time.Second)
+			continue
+		} else {
+			break
+		}
+	}
+
+	stop := false
+	destroy := false
+	del := false
+
+	if status == "running" {
+		stop = true
+		destroy = true
+		del = true
+	} else if status == "stopped" {
+		destroy = true
+		del = true
+	} else if status == "notcreated" {
+		del = true
+	} else {
+		return fmt.Errorf("Cannot delete machine \"%s\": invalid machine state", machineID)
+	}
+
+	if stop == true {
+		if err := c.StopMachine(machineID, force); err != nil {
+			return errors.Newf(err, errMsg)
+		}
+	}
+	if destroy == true {
+		if err := c.DestroyMachine(machineID); err != nil {
+			return errors.Newf(err, errMsg)
+		}
+	}
+	if del == true {
+		if err := c.DeleteMachineDefinition(machineID); err != nil {
+			return errors.Newf(err, errMsg)
+		}
 	}
 
 	return nil
