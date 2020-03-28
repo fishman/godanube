@@ -33,6 +33,7 @@ import (
 const (
 	contentTypeJSON        = "application/json"
 	contentTypeOctetStream = "application/octet-stream"
+	httpTimeout            = 10 * time.Second
 )
 
 type Client struct {
@@ -78,7 +79,7 @@ const (
 	MaxSendAttempts = 3
 )
 
-// New returns a new http *Client using the default net/http client.
+// New returns a new http *Client
 func New(credentials *auth.Credentials, apiVersion string, logger *log.Logger) *Client {
 	htclient :=  &http.Client{
 		// disable redirects
@@ -89,6 +90,7 @@ func New(credentials *auth.Credentials, apiVersion string, logger *log.Logger) *
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
+		Timeout: httpTimeout,
 	}
 	//DELME return &Client{*http.DefaultClient, MaxSendAttempts, credentials, apiVersion, logger, false}
 	return &Client{*htclient, MaxSendAttempts, credentials, apiVersion, logger, false}
@@ -176,7 +178,13 @@ func (c *Client) JsonRequest(method, url, rfc1123Date string, request *RequestDa
 	}
 	respBody, respHeader, reqErr := c.sendRequest(
 		method, url, bytes.NewReader(body), len(body), headers, response.ExpectedStatus, c.logger)
-	// we will handle the reqErr later
+
+	// we will handle the reqErr later because there can be unexpected http statuses
+	if respBody == nil {
+		// but response should not be null anyway
+		return reqErr
+	}
+
 	defer respBody.Close()
 
 	respData, err := ioutil.ReadAll(respBody)
