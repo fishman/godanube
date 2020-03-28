@@ -748,7 +748,7 @@ func (c *Client) DeleteMachine(machineID string, force bool) error {
 	errMsg := "failed to delete machine: " + machineID
 
 	var status string
-	for timeout := 30; timeout > 0; timeout-=1 {
+	for timeout := VmDeployTimeout; timeout > 0; timeout-=1 {
 		vmStatus, err := c.GetMachineState(machineID)
 		if err != nil {
 			return errors.Newf(err, errMsg)

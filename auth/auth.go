@@ -18,7 +18,7 @@ import (
 	//"encoding/pem"
 	//"fmt"
 	//"net/http"
-	"net/url"
+	//"net/url"
 	"strings"
 )
 
@@ -33,25 +33,27 @@ type Endpoint struct {
 }
 
 //DELME
+/*
 type JoyAuth struct {
 	User      string
 	PrivateKey PrivateKey
 	Algorithm string
-}
+}*/
 
 type Auth struct {
-	User      string
-	Pass      string
+	User      string	// for future use
+	Pass      string	// for future use
 	ApiKey    string
 }
 
 type Credentials struct {
 	UserAuthentication *Auth
-	SdcKeyId           string //DELME
-	SdcEndpoint        Endpoint //DELME
+	//SdcKeyId           string //DELME
+	//SdcEndpoint        Endpoint //DELME
 	ApiEndpoint        Endpoint
-	MantaKeyId         string	//DELME
-	MantaEndpoint      Endpoint	//DELME
+	VirtDatacenter     string	// virtual datacenter for executing all funcions
+	//MantaKeyId         string	//DELME
+	//MantaEndpoint      Endpoint	//DELME
 }
 
 type PrivateKey struct {
@@ -109,6 +111,11 @@ func getHashFunction(algorithm string) (hashFunc crypto.Hash) {
 }
 
 func (cred *Credentials) Region() string {
+	// we regard virtual datacenters as different regions
+	// (so we can switch between them)
+	// and they really have different sets of resources attached
+	return cred.VirtDatacenter
+	/*
 	parsedUrl, err := url.Parse(cred.SdcEndpoint.URL)
 	if err != nil {
 		// Bogus URL - no region.
@@ -124,4 +131,5 @@ func (cred *Credentials) Region() string {
 		return host[:firstDotIdx]
 	}
 	return host
+	*/
 }

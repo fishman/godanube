@@ -26,7 +26,7 @@ import (
 
 	"github.com/erigones/godanube"
 	"github.com/erigones/godanube/errors"
-	"github.com/erigones/godanube/jpc"
+	//"github.com/erigones/godanube/jpc"
 	"github.com/erigones/godanube/auth"
 )
 
@@ -143,8 +143,11 @@ func createHeaders(extraHeaders http.Header, credentials *auth.Credentials, cont
 }
 
 func getDateForRegion(credentials *auth.Credentials) string {
+	/*
 	location, _ := time.LoadLocation(jpc.Locations[credentials.Region()])
 	return time.Now().In(location).Format(time.RFC1123)
+	*/
+	return time.Now().Format(time.RFC1123)
 }
 
 // JsonRequest JSON encodes and sends the object in reqData.ReqValue (if any) to the specified URL.
@@ -423,6 +426,7 @@ func handleError(URL string, resp *http.Response) error {
 		return errors.NewNotAuthorizedf(httpError, "", "Unauthorised URL %s", URL)
 		//return errors.NewInvalidCredentialsf(httpError, "", "Unauthorised URL %s", URL)
 	case http.StatusForbidden:
+		return errors.NewNotAuthorizedf(httpError, "", "Unauthorised URL %s", URL)
 		//return errors.
 	case http.StatusNotFound:
 		return errors.NewResourceNotFoundf(httpError, "", "Resource not found %s", URL)

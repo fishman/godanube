@@ -44,13 +44,12 @@ func getclient(apiKey string, virtDc string, endpointUrl string) (*cloudapi.Clie
 	creds := &auth.Credentials{
 		UserAuthentication: userAuth,
 		ApiEndpoint:        auth.Endpoint{URL: endpointUrl},
+		VirtDatacenter:		vdc,
 	}
 
 	return cloudapi.New(client.NewClient(
-		creds.ApiEndpoint.URL,
-		virtDc,
-		cloudapi.DefaultAPIVersion,
 		creds,
+		cloudapi.DefaultAPIVersion,
 		log.New(os.Stderr, "", log.LstdFlags),
 	)), nil
 }
@@ -102,7 +101,6 @@ module main
 require github.com/erigones/godanube v0.0.0
 require github.com/erigones/godanube/client v0.0.0
 require github.com/erigones/godanube/errors v0.0.0
-require github.com/erigones/godanube/jpc v0.0.0
 require github.com/erigones/godanube/testing v0.0.0
 require github.com/erigones/godanube/cloudapi v0.0.0
 require github.com/erigones/godanube/localservices v0.0.0
@@ -110,7 +108,6 @@ require github.com/erigones/godanube/localservices/hook v0.0.0
 require github.com/erigones/godanube/auth v0.0.0
 replace github.com/erigones/godanube/client => ../godanube/client
 replace github.com/erigones/godanube/errors => ../godanube/errors
-replace github.com/erigones/godanube/jpc => ../godanube/jpc
 replace github.com/erigones/godanube/testing => ../godanube/testing
 replace github.com/erigones/godanube/cloudapi => ../godanube/cloudapi
 replace github.com/erigones/godanube/localservices => ../godanube/localservices

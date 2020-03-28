@@ -45,24 +45,24 @@ type Client interface {
 
 // This client sends requests without authenticating.
 type client struct {
-	mu         sync.Mutex
-	logger     *log.Logger
-	baseURL    string
-	virtDC     string	// virtual datacenter for executing all funcions
+	//baseURL    string
+	//virtDC     string	// virtual datacenter for executing all funcions
 	creds      *auth.Credentials
 	httpClient *danubehttp.Client
+	mu         sync.Mutex
+	logger     *log.Logger
 }
 
 var _ Client = (*client)(nil)
 
-func newClient(baseURL string, virtDC string, credentials *auth.Credentials, httpClient *danubehttp.Client, logger *log.Logger) Client {
-	client := client{baseURL: baseURL, virtDC: virtDC, logger: logger, creds: credentials, httpClient: httpClient}
+func newClient(credentials *auth.Credentials, httpClient *danubehttp.Client, logger *log.Logger) Client {
+	client := client{creds: credentials, logger: logger, httpClient: httpClient}
 	return &client
 }
 
-func NewClient(baseURL, virtDC string, apiVersion string, credentials *auth.Credentials, logger *log.Logger) Client {
+func NewClient(credentials *auth.Credentials, apiVersion string, logger *log.Logger) Client {
 	sharedHttpClient := danubehttp.New(credentials, apiVersion, logger)
-	return newClient(baseURL, virtDC, credentials, sharedHttpClient, logger)
+	return newClient(credentials, sharedHttpClient, logger)
 }
 
 func (c *client) sendRequest(method, url, rfc1123Date string, request *danubehttp.RequestData, response *danubehttp.ResponseData) (err error) {
@@ -80,15 +80,15 @@ func (c *client) sendRequest(method, url, rfc1123Date string, request *danubehtt
 
 func (c *client) SendRequest(method, apiCall, rfc1123Date string, request *danubehttp.RequestData, response *danubehttp.ResponseData) (err error) {
 	//DELME url := c.MakeServiceURL([]string{c.creds.UserAuthentication.User, apiCall})
-	url := makeURL(c.baseURL, []string{apiCall})
-	if c.virtDC != "" {
+	url := makeURL(c.creds.ApiEndpoint.URL, []string{apiCall})
+	if c.creds.VirtDatacenter != "" {
 		if request.Params != nil && request.Params.Get("dc") == "" {
-			// set default virtDC in GET params
-			request.Params.Set("dc", c.virtDC)
+			// set default VirtDatacenter in GET params
+			request.Params.Set("dc", c.creds.VirtDatacenter)
 		}
 		//if request.ReqValue != nil && request.ReqValue.Dc == "" {
 		if request.ReqValue != nil {
-			// set default virtDC in data json (non-GET call)
+			// set default VirtDatacenter in data json (non-GET call)
 			s := reflect.ValueOf(&request.ReqValue)
 			/**
 			The most common source of problems here is passing an object that has no 'Dc' member.
@@ -102,9 +102,7 @@ func (c *client) SendRequest(method, apiCall, rfc1123Date string, request *danub
 			req_dc := s.FieldByName("Dc").Interface()
 			//fmt.Println(req_dc)
 			if req_dc == "" {
-				s.FieldByName("Dc").SetString(c.virtDC)
-				//if request.ReqValue != nil && request.ReqValue.GetDC() == "" {
-				//request.ReqValue.Dc = c.virtDC
+				s.FieldByName("Dc").SetString(c.creds.VirtDatacenter)
 			}
 		}
 	}
@@ -158,10 +156,10 @@ func (c *client) SignURL(path string, expires time.Time) (string, error) {
 }
 
 func (c *client) SwitchVirtDC(virtDC string) {
-	c.virtDC = virtDC
+	c.creds.VirtDatacenter = virtDC
 }
 
 func (c *client) GetVirtDC() string {
-	return c.virtDC
+	return c.creds.VirtDatacenter
 }
 
