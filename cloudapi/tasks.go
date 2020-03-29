@@ -40,7 +40,7 @@ func (c *Client) GetTaskInfo(taskId string) (*TaskResponse, error) {
 }
 
 func (c *Client) GetRunningTasks() ([]string, error) {
-	var resp []string
+	var resp ResponseList
 	req := request{
 		method:     client.GET,
 		expectedStatuses: []int{http.StatusOK},
@@ -50,7 +50,7 @@ func (c *Client) GetRunningTasks() ([]string, error) {
 	if _, err := c.sendRequest(req); err != nil {
 		return nil, errors.Newf(err, "failed to get running tasks")
 	}
-	return resp, nil
+	return resp.Result, nil
 }
 
 func (c *Client) WaitForTaskStatus(taskId, targetStatus string, timeoutSec uint, validHTTPStatuses []int) (*TaskInfo, error) {
