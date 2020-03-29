@@ -204,27 +204,49 @@ func (c *Client) JsonRequest(method, url, rfc1123Date string, request *RequestDa
 
 	if len(respData) > 0 {
 		if response.RespValue != nil {
-			if dest, ok := response.RespValue.(*[]byte); ok {
-				*dest = respData
-				//err = decodeJSON(bytes.NewReader(respData), false, response.RespValue)
-				//if err != nil {
-				//	err = errors.Newf(err, "failed unmarshaling/decoding the response body: %s", respData)
-				//}
-			} else {
+			//if dest, ok := response.RespValue.(*[]byte); ok {
+			//	*dest = respData
+			//	//err = decodeJSON(bytes.NewReader(respData), false, response.RespValue)
+			//	//if err != nil {
+			//	//	err = errors.Newf(err, "failed unmarshaling/decoding the response body: %s", respData)
+			//	//}
+			//} else {
 				err = json.Unmarshal(respData, response.RespValue)
 				if err != nil {
-					err = errors.Newf(err, "failed unmarshaling the response body: %s", respData) //DELME
-					return err
+					err = errors.Newf(err, "failed unmarshaling the response body: %s", respData)
+					// Danube API has some calls where the response isn't wrapped into DcResponse.
+					// We'll try to cover these alternatives before throwing an error.
+
+					// First look for error message
+					errResNotFound := "Resource not found"
+					if string(respData) == errResNotFound {
+						return errors.NewInvalidArgumentf(nil, "", errResNotFound)
+					}
+
+					// Second, it might be a plain list (e.g. GetRunningTasks())
+					plainList := &[]string{}
+					err2 := json.Unmarshal(respData, plainList)
+					if err2 != nil {
+						// second try has failed, continue with the original failure
+						return err
+					} else {
+						// it is really a list, return it wrapped into DcResponse struct
+						wrappedResp := []byte(`{"Result": ` + string(respData) + `}`)
+						err2 = json.Unmarshal(wrappedResp, response.RespValue)
+						if err2 != nil {
+							err2 = errors.Newf(err, "failed unmarshaling the response body: %s", wrappedResp)
+							return err2
+						}
+					}
 					/*
 					err = decodeJSON(bytes.NewReader(respData), true, response.RespValue)
 					if err != nil {
 						err = errors.Newf(err, "failed unmarshaling/decoding the response body: %s", respData)
 					}
 					*/
-				} else { //DELME
-					fmt.Println("Unmarshalling succeeded")
 				}
-			}
+				fmt.Println("Unmarshalling succeeded")
+			//}
 		}
 	}
 
