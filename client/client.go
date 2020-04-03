@@ -37,16 +37,16 @@ type Client interface {
 	SendRequest(method, apiCall, rfc1123Date string, request *danubehttp.RequestData, response *danubehttp.ResponseData) (err error)
 	SwitchVirtDC(virtDC string)
 	GetVirtDC() string
+	SetTrace(traceEnabled bool)
 	// MakeServiceURL prepares a full URL to a service endpoint, with optional
 	// URL parts. It uses the first endpoint it can find for the given service type.
 	//DELME MakeServiceURL(parts []string) string
 	SignURL(path string, expires time.Time) (string, error)
+	Logger() *log.Logger
 }
 
 // This client sends requests without authenticating.
 type client struct {
-	//baseURL    string
-	//virtDC     string	// virtual datacenter for executing all funcions
 	creds      *auth.Credentials
 	httpClient *danubehttp.Client
 	mu         sync.Mutex
@@ -163,3 +163,10 @@ func (c *client) GetVirtDC() string {
 	return c.creds.VirtDatacenter
 }
 
+func (c *client) SetTrace(traceEnabled bool) {
+	c.httpClient.SetTrace(traceEnabled)
+}
+
+func (c *client) Logger() *log.Logger {
+	return c.logger
+}

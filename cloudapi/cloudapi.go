@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"fmt"
 
 	"github.com/erigones/godanube/client"
 	jh "github.com/erigones/godanube/http"
@@ -19,7 +18,7 @@ import (
 
 const (
 	// DefaultAPIVersion defines the default version of the Cloud API to use
-	DefaultAPIVersion = "~4.2"
+	DefaultAPIVersion = "4.3"
 
 	// CloudAPI URL parts
 	apiKeys                    = "keys"
@@ -202,8 +201,6 @@ func (c *Client) sendRequest(req request) (*jh.ResponseData, error) {
 		ExpectedStatus: req.expectedStatuses,
 	}
 
-	fmt.Printf("Calling %s on %s\n", req.method, req.url)
-
 	err := c.client.SendRequest(req.method, req.url, "", &request, &respData)
 	return &respData, err
 }
@@ -217,3 +214,6 @@ func (c *Client) SwitchVirtDC(virtDC string) {
 	c.client.SwitchVirtDC(virtDC)
 }
 
+func (c *Client) SetTrace(traceEnabled bool) {
+	c.client.SetTrace(traceEnabled)
+}

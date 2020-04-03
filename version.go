@@ -29,8 +29,8 @@ func (v *VersionNum) String() string {
 }
 
 var VersionNumber = VersionNum{
-	Major: 0,
-	Minor: 1,
+	Major: 4,
+	Minor: 3,
 	Micro: 0,
 }
 

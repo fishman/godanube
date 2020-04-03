@@ -20,7 +20,7 @@ import (
 	"crypto/tls"
 	"net/url"
 	//"reflect"
-	"strconv"
+	//"strconv"
 	//"strings"
 	"time"
 
@@ -34,6 +34,13 @@ const (
 	contentTypeJSON        = "application/json"
 	contentTypeOctetStream = "application/octet-stream"
 	httpTimeout            = 10 * time.Second
+	// The maximum number of times to try sending a request before we give up
+	// (assuming any unsuccessful attempts can be sensibly tried again).
+	MaxSendAttempts       = 20	// how many attempts to make before failing when throttled by server
+	// j XXX SET TO 120:
+	maxReqsPerMin         = 45	// this is server value
+	minTimeBetweenReqs    = time.Minute / (maxReqsPerMin - 1)
+	retryAfter            = 5 * time.Second		// how long to wait before next attempt when throttled
 )
 
 type Client struct {
@@ -43,6 +50,7 @@ type Client struct {
 	apiVersion      string
 	logger          *log.Logger
 	trace           bool
+	lastRequestTime time.Time
 }
 
 type ErrorResponse struct {
@@ -73,12 +81,6 @@ type ResponseData struct {
 	RespReader     io.ReadCloser
 }
 
-const (
-	// The maximum number of times to try sending a request before we give up
-	// (assuming any unsuccessful attempts can be sensibly tried again).
-	MaxSendAttempts = 3
-)
-
 // New returns a new http *Client
 func New(credentials *auth.Credentials, apiVersion string, logger *log.Logger) *Client {
 	htclient :=  &http.Client{
@@ -93,7 +95,7 @@ func New(credentials *auth.Credentials, apiVersion string, logger *log.Logger) *
 		Timeout: httpTimeout,
 	}
 	//DELME return &Client{*http.DefaultClient, MaxSendAttempts, credentials, apiVersion, logger, false}
-	return &Client{*htclient, MaxSendAttempts, credentials, apiVersion, logger, false}
+	return &Client{*htclient, MaxSendAttempts, credentials, apiVersion, logger, false, time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)}
 }
 
 // SetTrace allows control over whether requests will write their
@@ -199,8 +201,10 @@ func (c *Client) JsonRequest(method, url, rfc1123Date string, request *RequestDa
 	newStr := buf.String()
 	fmt.Printf(newStr)
 	*/
-	fmt.Println("respData:" + string(respData))
 	//DELME end
+	if c.logger != nil && c.trace {
+		c.logger.Printf("Response data:" + string(respData))
+	}
 
 	if len(respData) > 0 {
 		if response.RespValue != nil {
@@ -245,7 +249,9 @@ func (c *Client) JsonRequest(method, url, rfc1123Date string, request *RequestDa
 					}
 					*/
 				}
-				fmt.Println("Unmarshalling succeeded")
+				if c.logger != nil && c.trace {
+					c.logger.Println("Unmarshalling succeeded")
+				}
 			//}
 		}
 	}
@@ -331,6 +337,11 @@ func (c *Client) BinaryRequest(method, url, rfc1123Date string, request *Request
 func (c *Client) sendRequest(method, URL string, reqReader io.Reader, length int, headers http.Header,
 	expectedStatus []int, logger *log.Logger) (rc io.ReadCloser, respHeader *http.Header, err error) {
 	reqData := make([]byte, length)
+
+	if c.logger != nil && c.trace {
+		log.Printf("Calling %s on %s\n", method, URL)
+	}
+
 	if reqReader != nil {
 		nrRead, err := io.ReadFull(reqReader, reqData)
 		if err != nil {
@@ -340,18 +351,14 @@ func (c *Client) sendRequest(method, URL string, reqReader io.Reader, length int
 	}
 	rawResp, err := c.sendRateLimitedRequest(method, URL, headers, reqData, logger)
 	if err != nil {
-		return
+		return nil, nil, err
 	}
 
-	//c.trace = true	//DELME
 	if logger != nil && c.trace {
-		logger.Printf("Request: %s %s\n", method, URL)
 		logger.Printf("Request header: %s\n", headers)
 		logger.Printf("Request body: %s\n", reqData)
 		logger.Printf("Response: %s\n", rawResp.Status)
 		logger.Printf("Response header: %s\n", rawResp.Header)
-		logger.Printf("Response body: %s\n", rawResp.Body)
-		logger.Printf("Response error: %s\n", err)
 	}
 
 	foundStatus := false
@@ -393,14 +400,40 @@ func (c *Client) sendRateLimitedRequest(method, URL string, headers http.Header,
 			}
 		}
 		req.ContentLength = int64(len(reqData))
+
+		if c.lastRequestTime.Add(minTimeBetweenReqs).After(time.Now()) {
+			sleepTime := minTimeBetweenReqs - (time.Now().Sub(c.lastRequestTime))
+			if logger != nil && c.trace {
+				logger.Printf("Sleeping %.2f seconds between requests", sleepTime.Seconds())
+			}
+			time.Sleep(sleepTime)
+		}
+		c.lastRequestTime = time.Now()
+
 		resp, err = c.Do(req)
 		if err != nil {
 			return nil, errors.Newf(err, "failed executing the request %s", URL)
 		}
-		if resp.StatusCode != http.StatusRequestEntityTooLarge || resp.Header.Get("Retry-After") == "" {
+		if resp.StatusCode != http.StatusTooManyRequests {
 			return resp, nil
 		}
 		resp.Body.Close()
+
+		logger.Printf("Request rate exceeded. Waiting %.0f seconds before next request.", retryAfter.Seconds())
+		time.Sleep(retryAfter)
+		/*
+		respData, err := ioutil.ReadAll(resp.Body)
+		if len(respData) > 0 {
+			var dcResponse cloudapi.DcResponse
+			err = json.Unmarshal(respData, dcResponse)
+			if err != nil {
+				logger.Printf("Failed to parse err resp")
+			}
+			logger.Printf("Parsed err resp: " + dcResponse.Detail)
+		}
+		*/
+
+		/*
 		retryAfter, err := strconv.ParseFloat(resp.Header.Get("Retry-After"), 64)
 		if err != nil {
 			return nil, errors.Newf(err, "Invalid Retry-After header %s", URL)
@@ -409,9 +442,10 @@ func (c *Client) sendRateLimitedRequest(method, URL string, headers http.Header,
 			return nil, errors.Newf(err, "Resource limit exeeded at URL %s", URL)
 		}
 		if logger != nil {
-			logger.Println("Too many requests, retrying in %dms.", int(retryAfter*1000))
+			logger.Printf("Too many requests, retrying in %dms.", int(retryAfter*1000))
 		}
 		time.Sleep(time.Duration(retryAfter) * time.Second)
+		*/
 	}
 	return nil, errors.Newf(err, "Maximum number of attempts (%d) reached sending request to %s", c.maxSendAttempts, URL)
 }
