@@ -105,6 +105,10 @@ func (client *Client) SetTrace(traceEnabled bool) {
 	client.trace = traceEnabled
 }
 
+func (client *Client) GetTrace() bool {
+	return client.trace
+}
+
 func gojoyentAgent() string {
 	return fmt.Sprintf("godanube (%s)", godanube.Version)
 }

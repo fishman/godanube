@@ -38,6 +38,7 @@ type Client interface {
 	SwitchVirtDC(virtDC string)
 	GetVirtDC() string
 	SetTrace(traceEnabled bool)
+	GetTrace() bool
 	// MakeServiceURL prepares a full URL to a service endpoint, with optional
 	// URL parts. It uses the first endpoint it can find for the given service type.
 	//DELME MakeServiceURL(parts []string) string
@@ -165,6 +166,10 @@ func (c *client) GetVirtDC() string {
 
 func (c *client) SetTrace(traceEnabled bool) {
 	c.httpClient.SetTrace(traceEnabled)
+}
+
+func (c *client) GetTrace() bool {
+	return c.httpClient.GetTrace()
 }
 
 func (c *client) Logger() *log.Logger {

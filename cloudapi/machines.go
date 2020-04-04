@@ -360,8 +360,21 @@ func (c *Client) ListMachinesFilteredFull(vmfilter VmDetails) ([]VmDetails, erro
 		}
 	}
 
+	if c.client.GetTrace() {
+		c.client.Logger().Printf("Filtered VM list: %+v", GetVmUuids(vmListFiltered))
+	}
+
 	return vmListFiltered, nil
 }
+
+func GetVmUuids(vmDetails []VmDetails) []string {
+	var vmList []string
+	for _, vm := range vmDetails {
+		vmList = append(vmList, vm.Uuid)
+	}
+	return vmList
+}
+
 
 // returns simplified version - only list of names
 func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
@@ -369,11 +382,7 @@ func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
 	if err != nil {
 		return nil, err
 	} else {
-		var vmList []string
-		for _, vm := range vmListFull {
-			vmList = append(vmList, vm.Uuid)
-		}
-		return vmList, nil
+		return GetVmUuids(vmListFull), nil
 	}
 }
 
