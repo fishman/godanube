@@ -310,7 +310,7 @@ func (c *Client) ListMachines() ([]string, error) {
 	return resp.Result, nil
 }
 
-func (c *Client) ListMachinesFilteredFull(vmfilter VmDetails) ([]string, []VmDetails, error) {
+func (c *Client) ListMachinesFilteredFull(vmfilter VmDetails) ([]VmDetails, error) {
 //J
 	var resp VmsResponse
 	filter := NewFilter()
@@ -322,14 +322,14 @@ func (c *Client) ListMachinesFilteredFull(vmfilter VmDetails) ([]string, []VmDet
 		resp:   &resp,
 	}
 	if _, err := c.sendRequest(req); err != nil {
-		return nil, nil, errors.Newf2(err, resp.Detail, "failed to get list of machines")
+		return nil, errors.Newf2(err, resp.Detail, "failed to get list of machines")
 	}
 
-	vmDetails := resp.Result
-	var vmlist []string
+	allVMs := resp.Result
+	var vmListFiltered []VmDetails
 
 	// iterate over tags to filter VMs
-	for _, vm := range vmDetails {
+	for _, vm := range allVMs {
 		if
 		(vmfilter.Hostname != "" && strings.Contains(vm.Hostname, vmfilter.Hostname)) ||
 		(vmfilter.Uuid != "" && vmfilter.Uuid == vm.Uuid) ||
@@ -337,7 +337,7 @@ func (c *Client) ListMachinesFilteredFull(vmfilter VmDetails) ([]string, []VmDet
 		(vmfilter.Node != "" && strings.Contains(vm.Node, vmfilter.Node)) ||
 		(vmfilter.Owner != "" && vmfilter.Owner == vm.Owner) ||
 		(vmfilter.Status != "" && vmfilter.Status == vm.Status) {
-			vmlist = append(vmlist, vm.Hostname)
+			vmListFiltered = append(vmListFiltered, vm)
 
 		} else if vmfilter.Tags != nil {
 			someTagNotFound := false
@@ -355,20 +355,24 @@ func (c *Client) ListMachinesFilteredFull(vmfilter VmDetails) ([]string, []VmDet
 				}
 			}
 			if !someTagNotFound {
-				vmlist = append(vmlist, vm.Hostname)
+				vmListFiltered = append(vmListFiltered, vm)
 			}
 		}
 	}
 
-	return vmlist, vmDetails, nil
+	return vmListFiltered, nil
 }
 
 // returns simplified version - only list of names
 func (c *Client) ListMachinesFiltered(vmfilter VmDetails) ([]string, error) {
-	vmList, _, err := c.ListMachinesFilteredFull(vmfilter)
+	vmListFull, err := c.ListMachinesFilteredFull(vmfilter)
 	if err != nil {
 		return nil, err
 	} else {
+		var vmList []string
+		for _, vm := range vmListFull {
+			vmList = append(vmList, vm.Uuid)
+		}
 		return vmList, nil
 	}
 }
