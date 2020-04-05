@@ -13,13 +13,13 @@ import (
 	//"fmt"
 	"log"
 	//"net/url"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
-	"reflect"
 
-	danubehttp "github.com/erigones/godanube/http"
 	"github.com/erigones/godanube/auth"
+	danubehttp "github.com/erigones/godanube/http"
 )
 
 const (
@@ -95,10 +95,10 @@ func (c *client) SendRequest(method, apiCall, rfc1123Date string, request *danub
 			The most common source of problems here is passing an object that has no 'Dc' member.
 			(means ReqData is not inherited).
 			*/
-			//println(s.String())						// should return <*interface {} Value>
-			//println(s.Elem().String())				// should return <interface {} Value>
-			//println(s.Elem().Elem().String())			// should return <*cloudapi. ... Value>
-			//println(s.Elem().Elem().Elem().String())	// should return <cloudapi. ... Value>
+			//println(s.String())                      // should return <*interface {} Value>
+			//println(s.Elem().String())               // should return <interface {} Value>
+			//println(s.Elem().Elem().String())        // should return <*cloudapi. ... Value>
+			//println(s.Elem().Elem().Elem().String()) // should return <cloudapi. ... Value>
 			s = s.Elem().Elem().Elem()
 			req_dc := s.FieldByName("Dc").Interface()
 			//fmt.Println(req_dc)

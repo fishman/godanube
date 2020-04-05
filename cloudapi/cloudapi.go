@@ -58,6 +58,13 @@ const (
 	actionDisableFw = "disable_firewall"
 )
 
+const (
+	// access rights on objects
+	AccessPublic  = 1
+	AccessPrivate = 3
+	AccessDeleted = 4
+)
+
 // Client provides a means to access the Joyent CloudAPI
 // Final object that is returned to the caller by cloudapi.New() and interfaces all API calls by URL.
 type Client struct {
@@ -91,44 +98,45 @@ func (f *Filter) Add(filter, value string) {
 
 // request represents an API request
 type request struct {
-	method         string
-	url            string
-	filter         *Filter
-	reqValue       interface{}
-	reqHeader      http.Header
-	resp           interface{}
-	respHeader     *http.Header
-	expectedStatus int
+	method           string
+	url              string
+	filter           *Filter
+	reqValue         interface{}
+	reqHeader        http.Header
+	resp             interface{}
+	respHeader       *http.Header
+	expectedStatus   int
 	expectedStatuses []int
 }
 
 //TODO presunut
 /*** GENERIC DC STRUCTS ***/
 type GenericDcEntity struct {
-    Name         string    `json:"name,omitempty"`      // Unique readable identifier
-    Alias        string    `json:"alias,omitempty"`     // Friendly name
-    Uuid         string    `json:"uuid,omitempty"`
-    Owner        string    `json:"owner,omitempty"`     // Object owner
-    Access       int       `json:"access,omitempty"`    // public/private
-    Desc         string    `json:"desc,omitempty"`      // Longer description
-    Created      string    `json:"created,omitempty"`   // Object creation time
+	Name    string `json:"name,omitempty"`  // Unique readable identifier
+	Alias   string `json:"alias,omitempty"` // Friendly name
+	Uuid    string `json:"uuid,omitempty"`
+	Owner   string `json:"owner,omitempty"`   // Object owner
+	Access  int    `json:"access,omitempty"`  // public/private
+	Desc    string `json:"desc,omitempty"`    // Longer description
+	Created string `json:"created,omitempty"` // Object creation time
 }
+
 /*** STRUCTS FOR GENERIC DC RESPONSES ***/
 type DcResponse struct {
-	Status	string
-	Task_id	string
-	Detail	string
+	Status  string
+	Task_id string
+	Detail  string
 	//Result interface{}
 }
 type ResponseList struct {
 	DcResponse
-	Result []string	`json:"result"`
+	Result []string `json:"result"`
 }
 
 /*** STRUCTS FOR GENERIC DC REQUESTS ***/
 type ReqData struct {
-	Dc		string		`json:"dc,omitempty"`
-	Force	bool		`json:"force,omitempty"`
+	Dc    string `json:"dc,omitempty"`
+	Force bool   `json:"force,omitempty"`
 }
 
 /*
@@ -139,7 +147,6 @@ type StatusQuery struct {
 	Text	TaskResponse
 }
 */
-
 
 //DELME start
 /*

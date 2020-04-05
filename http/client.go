@@ -11,14 +11,15 @@ package http
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"crypto/tls"
 	"net/url"
+
 	//"reflect"
 	//"strconv"
 	//"strings"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/erigones/godanube"
 	"github.com/erigones/godanube/errors"
+
 	//"github.com/erigones/godanube/jpc"
 	"github.com/erigones/godanube/auth"
 )
@@ -36,11 +38,11 @@ const (
 	httpTimeout            = 10 * time.Second
 	// The maximum number of times to try sending a request before we give up
 	// (assuming any unsuccessful attempts can be sensibly tried again).
-	MaxSendAttempts       = 20	// how many attempts to make before failing when throttled by server
+	MaxSendAttempts = 20 // how many attempts to make before failing when throttled by server
 	// j XXX SET TO 120:
-	maxReqsPerMin         = 45	// this is server value
-	minTimeBetweenReqs    = time.Minute / (maxReqsPerMin - 1)
-	retryAfter            = 5 * time.Second		// how long to wait before next attempt when throttled
+	maxReqsPerMin      = 45 // this is server value
+	minTimeBetweenReqs = time.Minute / (maxReqsPerMin - 1)
+	retryAfter         = 5 * time.Second // how long to wait before next attempt when throttled
 )
 
 type Client struct {
@@ -83,7 +85,7 @@ type ResponseData struct {
 
 // New returns a new http *Client
 func New(credentials *auth.Credentials, apiVersion string, logger *log.Logger) *Client {
-	htclient :=  &http.Client{
+	htclient := &http.Client{
 		// disable redirects
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -142,7 +144,8 @@ func createHeaders(extraHeaders http.Header, credentials *auth.Credentials, cont
 	}
 	headers.Set("Authorization", authHeaders)
 	*/
-	headers.Set("Es-Api-Key", credentials.UserAuthentication.ApiKey)
+	headers.Set("es-api-key", credentials.UserAuthentication.ApiKey)
+	//headers.Set("es-stream", "es")
 	if apiVersion != "" {
 		headers.Set("X-Api-Version", apiVersion)
 	}
@@ -152,8 +155,8 @@ func createHeaders(extraHeaders http.Header, credentials *auth.Credentials, cont
 
 func getDateForRegion(credentials *auth.Credentials) string {
 	/*
-	location, _ := time.LoadLocation(jpc.Locations[credentials.Region()])
-	return time.Now().In(location).Format(time.RFC1123)
+		location, _ := time.LoadLocation(jpc.Locations[credentials.Region()])
+		return time.Now().In(location).Format(time.RFC1123)
 	*/
 	return time.Now().Format(time.RFC1123)
 }
@@ -200,10 +203,10 @@ func (c *Client) JsonRequest(method, url, rfc1123Date string, request *RequestDa
 	}
 	//DELME start
 	/*
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(rawResp.Body)
-	newStr := buf.String()
-	fmt.Printf(newStr)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(rawResp.Body)
+		newStr := buf.String()
+		fmt.Printf(newStr)
 	*/
 	//DELME end
 	if c.logger != nil && c.trace {
@@ -219,43 +222,43 @@ func (c *Client) JsonRequest(method, url, rfc1123Date string, request *RequestDa
 			//	//	err = errors.Newf(err, "failed unmarshaling/decoding the response body: %s", respData)
 			//	//}
 			//} else {
-				err = json.Unmarshal(respData, response.RespValue)
-				if err != nil {
-					err = errors.Newf(err, "failed unmarshaling the response body: %s", respData)
-					// Danube API has some calls where the response isn't wrapped into DcResponse.
-					// We'll try to cover these alternatives before throwing an error.
+			err = json.Unmarshal(respData, response.RespValue)
+			if err != nil {
+				err = errors.Newf(err, "failed unmarshaling the response body: %s", respData)
+				// Danube API has some calls where the response isn't wrapped into DcResponse.
+				// We'll try to cover these alternatives before throwing an error.
 
-					// First look for error message
-					errResNotFound := "Resource not found"
-					if string(respData) == errResNotFound {
-						return errors.NewInvalidArgumentf(nil, "", errResNotFound)
-					}
+				// First look for error message
+				errResNotFound := "Resource not found"
+				if string(respData) == errResNotFound {
+					return errors.NewInvalidArgumentf(nil, "", errResNotFound)
+				}
 
-					// Second, it might be a plain list (e.g. GetRunningTasks())
-					plainList := &[]string{}
-					err2 := json.Unmarshal(respData, plainList)
+				// Second, it might be a plain list (e.g. GetRunningTasks())
+				plainList := &[]string{}
+				err2 := json.Unmarshal(respData, plainList)
+				if err2 != nil {
+					// second try has failed, continue with the original failure
+					return err
+				} else {
+					// it is really a list, return it wrapped into DcResponse struct
+					wrappedResp := []byte(`{"Result": ` + string(respData) + `}`)
+					err2 = json.Unmarshal(wrappedResp, response.RespValue)
 					if err2 != nil {
-						// second try has failed, continue with the original failure
-						return err
-					} else {
-						// it is really a list, return it wrapped into DcResponse struct
-						wrappedResp := []byte(`{"Result": ` + string(respData) + `}`)
-						err2 = json.Unmarshal(wrappedResp, response.RespValue)
-						if err2 != nil {
-							err2 = errors.Newf(err, "failed unmarshaling the response body: %s", wrappedResp)
-							return err2
-						}
+						err2 = errors.Newf(err, "failed unmarshaling the response body: %s", wrappedResp)
+						return err2
 					}
-					/*
+				}
+				/*
 					err = decodeJSON(bytes.NewReader(respData), true, response.RespValue)
 					if err != nil {
 						err = errors.Newf(err, "failed unmarshaling/decoding the response body: %s", respData)
 					}
-					*/
-				}
-				if c.logger != nil && c.trace {
-					c.logger.Println("Unmarshalling succeeded")
-				}
+				*/
+			}
+			if c.logger != nil && c.trace {
+				c.logger.Println("Unmarshalling succeeded")
+			}
 			//}
 		}
 	}
@@ -264,7 +267,7 @@ func (c *Client) JsonRequest(method, url, rfc1123Date string, request *RequestDa
 		response.RespHeaders = respHeader
 	}
 
-	// if we've got here, the response was valid. But there might have been an unexpected 
+	// if we've got here, the response was valid. But there might have been an unexpected
 	// response status. In that case return both: the content and also the error.
 	return reqErr
 }
@@ -426,29 +429,29 @@ func (c *Client) sendRateLimitedRequest(method, URL string, headers http.Header,
 		logger.Printf("Request rate exceeded. Waiting %.0f seconds before next request.", retryAfter.Seconds())
 		time.Sleep(retryAfter)
 		/*
-		respData, err := ioutil.ReadAll(resp.Body)
-		if len(respData) > 0 {
-			var dcResponse cloudapi.DcResponse
-			err = json.Unmarshal(respData, dcResponse)
-			if err != nil {
-				logger.Printf("Failed to parse err resp")
+			respData, err := ioutil.ReadAll(resp.Body)
+			if len(respData) > 0 {
+				var dcResponse cloudapi.DcResponse
+				err = json.Unmarshal(respData, dcResponse)
+				if err != nil {
+					logger.Printf("Failed to parse err resp")
+				}
+				logger.Printf("Parsed err resp: " + dcResponse.Detail)
 			}
-			logger.Printf("Parsed err resp: " + dcResponse.Detail)
-		}
 		*/
 
 		/*
-		retryAfter, err := strconv.ParseFloat(resp.Header.Get("Retry-After"), 64)
-		if err != nil {
-			return nil, errors.Newf(err, "Invalid Retry-After header %s", URL)
-		}
-		if retryAfter == 0 {
-			return nil, errors.Newf(err, "Resource limit exeeded at URL %s", URL)
-		}
-		if logger != nil {
-			logger.Printf("Too many requests, retrying in %dms.", int(retryAfter*1000))
-		}
-		time.Sleep(time.Duration(retryAfter) * time.Second)
+			retryAfter, err := strconv.ParseFloat(resp.Header.Get("Retry-After"), 64)
+			if err != nil {
+				return nil, errors.Newf(err, "Invalid Retry-After header %s", URL)
+			}
+			if retryAfter == 0 {
+				return nil, errors.Newf(err, "Resource limit exeeded at URL %s", URL)
+			}
+			if logger != nil {
+				logger.Printf("Too many requests, retrying in %dms.", int(retryAfter*1000))
+			}
+			time.Sleep(time.Duration(retryAfter) * time.Second)
 		*/
 	}
 	return nil, errors.Newf(err, "Maximum number of attempts (%d) reached sending request to %s", c.maxSendAttempts, URL)
@@ -474,15 +477,15 @@ func (e *HttpError) Error() string {
 // We also make a guess at duplicate value errors.
 func handleError(URL string, resp *http.Response) error {
 	/*
-	errBytes, _ := ioutil.ReadAll(resp.Body)
-	errInfo := string(errBytes)
-	// Check if we have a JSON representation of the failure, if so decode it.
-	if resp.Header.Get("Content-Type") == contentTypeJSON {
-		var errResponse ErrorResponse
-		if err := json.Unmarshal(errBytes, &errResponse); err == nil {
-			errInfo = errResponse.Message
+		errBytes, _ := ioutil.ReadAll(resp.Body)
+		errInfo := string(errBytes)
+		// Check if we have a JSON representation of the failure, if so decode it.
+		if resp.Header.Get("Content-Type") == contentTypeJSON {
+			var errResponse ErrorResponse
+			if err := json.Unmarshal(errBytes, &errResponse); err == nil {
+				errInfo = errResponse.Message
+			}
 		}
-	}
 	*/
 	httpError := &HttpError{
 		resp.StatusCode, map[string][]string(resp.Header), URL, "",
@@ -501,7 +504,7 @@ func handleError(URL string, resp *http.Response) error {
 	case http.StatusMethodNotAllowed:
 		//return errors.
 	case http.StatusNotAcceptable:
-		return errors.NewInvalidHeaderf(httpError, "", "Invalid Header %s", URL)
+		return errors.NewAlreadyExistsf(httpError, "", "Already exists")
 	case http.StatusConflict:
 		return errors.NewMissingParameterf(httpError, "", "Missing parameters %s", URL)
 		//return errors.NewInvalidArgumentf(httpError, "", "Invalid parameter %s", URL)

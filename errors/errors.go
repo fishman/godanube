@@ -25,6 +25,7 @@ const (
 	InvalidVersionError     = Code("InvalidVersion")
 	MissingParameterError   = Code("MissinParameter")
 	NotAuthorizedError      = Code("NotAuthorized")
+	AlreadyExistsError      = Code("AlreadyExists")
 	RequestThrottledError   = Code("RequestThrottled")
 	RequestTooLargeError    = Code("RequestTooLarge")
 	RequestMovedError       = Code("RequestMoved")
@@ -134,6 +135,13 @@ func IsMissingParameter(err error) bool {
 func IsNotAuthorized(err error) bool {
 	if e, ok := err.(*gojoyentError); ok {
 		return e.causedBy(NotAuthorizedError)
+	}
+	return false
+}
+
+func IsAlreadyExists(err error) bool {
+	if e, ok := err.(*gojoyentError); ok {
+		return e.causedBy(AlreadyExistsError)
 	}
 	return false
 }
@@ -257,6 +265,14 @@ func NewNotAuthorizedf(cause error, context interface{}, format string, args ...
 		format = fmt.Sprintf("Not Authorized: %s", context)
 	}
 	return makeErrorf(NotAuthorizedError, cause, format, args...)
+}
+
+// New creates a new NotAuthorized Error instance with the specified cause.
+func NewAlreadyExistsf(cause error, context interface{}, format string, args ...interface{}) Error {
+	if format == "" {
+		format = fmt.Sprintf("Item already exists: %s", context)
+	}
+	return makeErrorf(AlreadyExistsError, cause, format, args...)
 }
 
 // New creates a new RequestThrottled Error instance with the specified cause.
