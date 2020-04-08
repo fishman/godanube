@@ -79,7 +79,7 @@ type CreateImageFromMachineOpts struct {
 }
 
 // ListImages provides a list of image names available in the Danube Cloud.
-// This call needs SuperAdmin rights. With lower Admin rights use ListImagesInVdc()
+// This call needs SuperAdmin rights. With Admin rights use ListAttachedImages()
 func (c *Client) ListImages() ([]string, error) {
 	//J
 	var resp ResponseList
@@ -98,13 +98,48 @@ func (c *Client) ListImages() ([]string, error) {
 	return resp.Result, nil
 }
 
+func (c *Client) ListAttachedImages() ([]Image, error) {
+	//J
+	var resp ImageResponseFull
+	filter := NewFilter()
+	filter.Set("full", "true")
+	req := request{
+		method:           client.GET,
+		url:              makeURL("dc", c.client.GetVirtDC(), "image"),
+		filter:           filter,
+		expectedStatuses: []int{http.StatusOK},
+		resp:             &resp,
+	}
+	if _, err := c.sendRequest(req); err != nil {
+		return nil, errors.Newf2(err, resp.Detail, "failed to get list of images")
+	}
+	return resp.Result, nil
+}
+
 // GetImage returns the image details.
+// This call needs SuperAdmin rights. With Admin rights use GetAttachedImage()
 func (c *Client) GetImage(imageName string) (*Image, error) {
 	//J
 	var resp ImageResponse
 	req := request{
 		method:           client.GET,
 		url:              makeURL("image", imageName),
+		expectedStatuses: []int{http.StatusOK},
+		resp:             &resp,
+	}
+	if _, err := c.sendRequest(req); err != nil {
+		return nil, errors.Newf2(err, resp.Detail, "failed to get image info for \"%s\"", imageName)
+	}
+	return &resp.Result, nil
+}
+
+// GetAttachedImage returns the details of the image that is attached in the active virtual datacenter.
+func (c *Client) GetAttachedImage(imageName string) (*Image, error) {
+	//J
+	var resp ImageResponse
+	req := request{
+		method:           client.GET,
+		url:              makeURL("dc", c.client.GetVirtDC(), "image", imageName),
 		expectedStatuses: []int{http.StatusOK},
 		resp:             &resp,
 	}
@@ -152,24 +187,6 @@ func (c *Client) CreateImageFromMachine(opts CreateImageFromMachineOpts) (*Image
 	return &resp, nil
 }
 */
-
-func (c *Client) ListImagesInVdc() ([]Image, error) {
-	//J
-	var resp ImageResponseFull
-	filter := NewFilter()
-	filter.Set("full", "true")
-	req := request{
-		method:           client.GET,
-		url:              makeURL("dc", c.client.GetVirtDC(), "image"),
-		filter:           filter,
-		expectedStatuses: []int{http.StatusOK},
-		resp:             &resp,
-	}
-	if _, err := c.sendRequest(req); err != nil {
-		return nil, errors.Newf2(err, resp.Detail, "failed to get list of images")
-	}
-	return resp.Result, nil
-}
 
 func (c *Client) ListImgRepos() ([]string, error) {
 	//J
