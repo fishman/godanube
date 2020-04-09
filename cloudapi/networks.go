@@ -13,9 +13,9 @@ type Network struct {
     Gateway     string          `json:"gateway,omitempty`
     Nic_tag     string          `json:"nic_tag,omitempty`
     Nic_tag_type string         `json:"nic_tag_type,omitempty`
-    Vlan_id     *int            `json:"vlan_id,omitempty`
-    Vxlan_id    *int            `json:"vxlan_id,omitempty`
-    Mtu         *int            `json:"mtu,omitempty`
+    Vlan_id     int            `json:"vlan_id,omitempty`
+    Vxlan_id    int            `json:"vxlan_id,omitempty`
+    Mtu         int            `json:"mtu,omitempty`
     Resolvers   []string        `json:"resolvers,omitempty`
     Dns_domain  string          `json:"dns_domain,omitempty`
     Ptr_domain  string          `json:"ptr_domain,omitempty`
