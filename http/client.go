@@ -362,7 +362,7 @@ func (c *Client) sendRequest(method, URL string, reqReader io.Reader, length int
 	}
 
 	if logger != nil && c.trace {
-		logger.Printf("Request header: %s\n", headers)
+		//logger.Printf("Request header: %s\n", headers)
 		logger.Printf("Request body: %s\n", reqData)
 		logger.Printf("Response: %s\n", rawResp.Status)
 		logger.Printf("Response header: %s\n", rawResp.Header)
@@ -410,9 +410,11 @@ func (c *Client) sendRateLimitedRequest(method, URL string, headers http.Header,
 
 		if c.lastRequestTime.Add(minTimeBetweenReqs).After(time.Now()) {
 			sleepTime := minTimeBetweenReqs - (time.Now().Sub(c.lastRequestTime))
-			if logger != nil && c.trace {
-				logger.Printf("Sleeping %.2f seconds between requests", sleepTime.Seconds())
-			}
+			/*
+				if logger != nil && c.trace {
+					logger.Printf("Sleeping %.2f seconds between requests", sleepTime.Seconds())
+				}
+			*/
 			time.Sleep(sleepTime)
 		}
 		c.lastRequestTime = time.Now()
