@@ -594,7 +594,9 @@ func (c *Client) CreateMachine(definition CreateMachineOpts) (*MachineDefinition
 //J
 	machine, err := c.CreateMachineDefinition(definition.Vm)
 	if err != nil {
-		c.DeleteMachineDefinition(machine.Uuid)
+		if machine != nil {
+			c.DeleteMachineDefinition(machine.Uuid)
+		}
 		return nil, err
 	}
 

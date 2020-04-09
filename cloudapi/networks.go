@@ -19,7 +19,7 @@ type Network struct {
     Resolvers   []string        `json:"resolvers,omitempty`
     Dns_domain  string          `json:"dns_domain,omitempty`
     Ptr_domain  string          `json:"ptr_domain,omitempty`
-    Dhcp_passthrough *bool       `json:"dhcp_passthrough,omitempty`
+    Dhcp_passthrough bool       `json:"dhcp_passthrough,omitempty`
     Dcs         []string        `json:"dcs,omitempty"`      // vDC list where the network is attached
 }
 
