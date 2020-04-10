@@ -136,6 +136,9 @@ type VmNicDefinition struct {
 	AllowedIps               []string      `json:"allowed_ips,omitempty"`
 	Monitoring               bool          `json:"monitoring,omitempty"`
 	SetGateway               bool          `json:"set_gateway,omitempty"`
+
+    // Not settable, only for querying:
+	Netmask                  string        `json:"netmask,omitempty"`
 }
 
 type VmDiskDefinition struct {
