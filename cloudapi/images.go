@@ -2,6 +2,7 @@ package cloudapi
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/erigones/godanube/client"
 	"github.com/erigones/godanube/errors"
@@ -39,6 +40,13 @@ type Image struct {
 	*/
 }
 
+type ImageRepo struct {
+	Url        string    `json:"url,omitempty"`
+	Name       string    `json:"name,omitempty""`
+	ImageCount int       `json:"image_count,omitempty"`
+	LastUpdate time.Time `json:"last_update,omitempty"`
+	Error      string    `json:"error,omitempty"`
+}
 /*** STRUCTS FOR IMAGE-SPECIFIC DC RESPONSES ***/
 type ImageResponse struct {
 	DcResponse
@@ -48,6 +56,11 @@ type ImageResponse struct {
 type ImageResponseFull struct {
 	DcResponse
 	Result []Image `json:"result"`
+}
+
+type ImageRepoResponse struct {
+	DcResponse
+	Result ImageRepo `json:"result"`
 }
 
 /* DELME
@@ -201,6 +214,21 @@ func (c *Client) ListImgRepos() ([]string, error) {
 		return nil, errors.Newf2(err, resp.Detail, "failed to get list of configured repos")
 	}
 	return resp.Result, nil
+}
+
+func (c *Client) GetImgRepo(repoName string) (*ImageRepo, error) {
+	//J
+	var resp ImageRepoResponse
+	req := request{
+		method:           client.GET,
+		url:              makeURL("imagestore", repoName),
+		expectedStatuses: []int{http.StatusOK},
+		resp:             &resp,
+	}
+	if _, err := c.sendRequest(req); err != nil {
+		return nil, errors.Newf2(err, resp.Detail, "failed to get repository info")
+	}
+	return &resp.Result, nil
 }
 
 func (c *Client) RefreshImgRepo(repoName string) error {
