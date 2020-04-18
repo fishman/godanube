@@ -29,6 +29,9 @@ type Image struct {
 	/* only for ListImagesInVdc() */
 	DcBound bool `json:"dc_bound,omitempty"` // Whether the image is dedicated to one vDC
 
+	/* only for GetRemoteImageInfo() */
+	Manifest	interface{}	`json:"manifest,omitempty"`
+
 	/*DELME
 	Requirements map[string]interface{} // Minimum requirements for provisioning a machine with this image, e.g. 'password' indicates that a password must be provided
 	Homepage     string                 // URL for a web page including detailed information for this image (new in API version 7.0)
@@ -158,6 +161,22 @@ func (c *Client) GetAttachedImage(imageName string) (*Image, error) {
 	}
 	if _, err := c.sendRequest(req); err != nil {
 		return nil, errors.Newf2(err, resp.Detail, "failed to get image info for \"%s\"", imageName)
+	}
+	return &resp.Result, nil
+}
+
+// GetRemoteImageInfo returns the details of the remote image that is present in the specified repo
+func (c *Client) GetRemoteImageInfo(imageUuid, repoName string) (*Image, error) {
+	//J
+	var resp ImageResponse
+	req := request{
+		method:           client.GET,
+		url:              makeURL("imagestore", repoName, "image", imageUuid),
+		expectedStatuses: []int{http.StatusOK},
+		resp:             &resp,
+	}
+	if _, err := c.sendRequest(req); err != nil {
+		return nil, errors.Newf2(err, resp.Detail, "failed to get image info for \"%s\"", imageUuid)
 	}
 	return &resp.Result, nil
 }
