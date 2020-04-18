@@ -216,6 +216,21 @@ func (c *Client) ListImgRepos() ([]string, error) {
 	return resp.Result, nil
 }
 
+func (c *Client) ListRemoteImages(repoName string) ([]string, error) {
+	//J
+	var resp ResponseList
+	req := request{
+		method:           client.GET,
+		url:              makeURL("imagestore", repoName, "image"),
+		expectedStatuses: []int{http.StatusOK},
+		resp:             &resp,
+	}
+	if _, err := c.sendRequest(req); err != nil {
+		return nil, errors.Newf2(err, resp.Detail, "failed to get list of remote images")
+	}
+	return resp.Result, nil
+}
+
 func (c *Client) GetImgRepo(repoName string) (*ImageRepo, error) {
 	//J
 	var resp ImageRepoResponse
