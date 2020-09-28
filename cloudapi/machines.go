@@ -502,7 +502,7 @@ func (c *Client) CreateMachineDefinition(opts MachineDefinition) (*MachineDefini
 }
 
 func (c *Client) AddMachineNicDefinition(machineID string, opts VmNicDefinition) (*VmNicDefinition, error) {
-    errStr := "failed to reate nic definition for machine: %s"
+    errStr := "failed to create nic definition for machine: %s"
     nics, nicErr := c.GetMachineNics(machineID)
 	if nicErr != nil {
 		return nil, errors.Newf(nicErr, errStr, machineID)
